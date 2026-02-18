@@ -121,22 +121,48 @@ export const getCoinDetails = async (id: string): Promise<Coin | null> => {
     }
 };
 
-export const getCoinHistory = async (id: string, interval = 'd1'): Promise<CoinHistory[]> => {
+export const getCoinHistory = async (id: string, interval = '1D'): Promise<CoinHistory[]> => {
     try {
-        // 1. Get symbol first (we need it for Binance)
-        // We can optimistically guessing symbol from ID? No.
-        // We need to fetch details or passed symbol. 
-        // For efficiency, we assume specific common mappings or fetch details.
-        // Let's fetch details to get the symbol.
         const coin = await getCoinDetails(id);
         if (!coin) throw new Error(`Coin ${id} not found for history.`);
 
         const symbol = coin.symbol.toUpperCase();
-        const pair = `${symbol}USDT`;
+        // Handle special cases or default generic pairing
+        // Most alts trade against USDT. 
+        // If symbol is USDT (Tether), maybe trade against USDC or ignore? 
+        // For simplicity, assume USDT pair.
+        const pair = symbol === 'USDT' ? 'USDCUSDT' : `${symbol}USDT`;
 
-        // Map interval
-        const binanceInterval = interval === 'h1' ? '1h' : '1d';
-        const limit = interval === 'h1' ? '24' : '30';
+        // Map UI intervals to Binance API params
+        // Binance Intervals: 1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
+        let binanceInterval = '1d';
+        let limit = 30;
+
+        switch (interval) {
+            case '1H':
+                binanceInterval = '1m'; // 1 minute candles for last hour
+                limit = 60;
+                break;
+            case '1D':
+                binanceInterval = '1h'; // 1 hour candles for last 24h
+                limit = 24;
+                break;
+            case '1W':
+                binanceInterval = '4h'; // 4 hour candles for last week (4h * 42 = 7 days)
+                limit = 42;
+                break;
+            case '1M':
+                binanceInterval = '1d'; // 1 day candles for last 30 days
+                limit = 30;
+                break;
+            case '1Y':
+                binanceInterval = '1w'; // 1 week candles for last year
+                limit = 52;
+                break;
+            default:
+                binanceInterval = '1d';
+                limit = 30;
+        }
 
         const response = await axios.get<any[]>(`${BINANCE_API_URL}/klines`, {
             params: {
@@ -150,27 +176,38 @@ export const getCoinHistory = async (id: string, interval = 'd1'): Promise<CoinH
         // Map Binance Kline [OpenTime, Open, High, Low, Close, Volume, ...]
         return response.data.map((kline: any[]) => ({
             priceUsd: kline[4], // Close price
-            time: kline[0],
+            time: kline[0], // Open time
             date: new Date(kline[0]).toISOString()
         }));
 
     } catch (error) {
-        console.warn(`Error fetching history for ${id} from Binance, using mock data:`, error);
+        console.warn(`Error fetching history for ${id} (${interval}) from Binance, using mock data:`, error);
 
-        // Generate mock history
+        // Generate mock history fallback
         const now = Date.now();
         const history: CoinHistory[] = [];
-        let price = id === 'bitcoin' ? 95000 : id === 'ethereum' ? 3500 : 0.35;
+        let basePrice = id === 'bitcoin' ? 95000 : id === 'ethereum' ? 3500 : 100;
 
-        const points = interval === 'h1' ? 24 : 30;
-        const timeStep = interval === 'h1' ? 3600 * 1000 : 24 * 3600 * 1000;
+        let points = 30;
+        let timeStep = 24 * 3600 * 1000;
+
+        switch (interval) {
+            case '1H': points = 60; timeStep = 60 * 1000; break;
+            case '1D': points = 24; timeStep = 3600 * 1000; break;
+            case '1W': points = 42; timeStep = 4 * 3600 * 1000; break;
+            case '1M': points = 30; timeStep = 24 * 3600 * 1000; break;
+            case '1Y': points = 52; timeStep = 7 * 24 * 3600 * 1000; break;
+        }
 
         for (let i = 0; i < points; i++) {
-            price = price * (1 + (Math.random() * 0.1 - 0.05));
+            const randomChange = 1 + (Math.random() * 0.04 - 0.02); // +/- 2%
+            basePrice = basePrice * randomChange;
+
+            const time = now - (points - i - 1) * timeStep;
             history.push({
-                priceUsd: price.toString(),
-                time: now - (points - i) * timeStep,
-                date: new Date(now - (points - i) * timeStep).toISOString(),
+                priceUsd: basePrice.toFixed(2),
+                time: time,
+                date: new Date(time).toISOString(),
             });
         }
         return history;

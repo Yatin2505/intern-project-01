@@ -1,10 +1,13 @@
+import { useState, useEffect } from 'react';
 import { GetServerSideProps } from 'next';
 import { NextSeo, ArticleJsonLd } from 'next-seo';
 import Link from 'next/link';
 import { getCoinDetails, getCoinHistory } from '@/lib/coincap';
 import { Coin, CoinHistory } from '@/types/coin';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, ExternalLink, Clock } from 'lucide-react';
+import clsx from 'clsx';
+import { motion } from 'framer-motion';
 
 interface CoinDetailProps {
     coin: Coin | null;
@@ -16,7 +19,7 @@ export const getServerSideProps: GetServerSideProps<CoinDetailProps> = async (co
     const { id } = context.params as { id: string };
     const [coin, history] = await Promise.all([
         getCoinDetails(id),
-        getCoinHistory(id, 'h1'), // Hour intervals for last 24h
+        getCoinHistory(id, '1D'), // Default to 1 Day
     ]);
 
     if (!coin) {
@@ -34,11 +37,61 @@ export const getServerSideProps: GetServerSideProps<CoinDetailProps> = async (co
     };
 };
 
-export default function CoinDetail({ coin, history, lastUpdated }: CoinDetailProps) {
+const TIME_RANGES = [
+    { label: '1H', value: '1H' },
+    { label: '1D', value: '1D' },
+    { label: '1W', value: '1W' },
+    { label: '1M', value: '1M' },
+    { label: '1Y', value: '1Y' },
+];
+
+export default function CoinDetail({ coin, history: initialHistory, lastUpdated }: CoinDetailProps) {
+    const [history, setHistory] = useState<CoinHistory[]>(initialHistory);
+    const [interval, setInterval] = useState('1D');
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Effect to fetch history when interval changes (client-side)
+    useEffect(() => {
+        if (!coin || interval === '1D') return; // Initial load handled by SSR for 1D
+
+        const fetchHistory = async () => {
+            setIsLoading(true);
+            try {
+                // We need an API endpoint for this to avoid exposing API keys or huge client-side logic
+                // But since our fetch logic is in lib/coincap.ts which uses public APIs, we can technically call it via API route
+                // For now, let's create a simple API route or just refetch via client-side mapped calls
+                // Actually, nextjs lib files can be imported client side if they don't use server secrets.
+                // However, CORS might be an issue with Binance from client.
+                // BEST PRACTICE: Create an API route /api/history
+
+                // Temporary: call internal API route
+                const res = await fetch(`/api/history?id=${coin.id}&interval=${interval}`);
+                const data = await res.json();
+                if (data.history) {
+                    setHistory(data.history);
+                }
+            } catch (error) {
+                console.error("Failed to fetch history", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchHistory();
+    }, [interval, coin]);
+
+    // Update history state if initialHistory changes (re-validation)
+    useEffect(() => {
+        if (interval === '1D') {
+            setHistory(initialHistory);
+        }
+    }, [initialHistory, interval]);
+
+
     if (!coin) return null;
 
     const chartData = history.map(point => ({
-        date: new Date(point.time).toLocaleTimeString(),
+        date: new Date(point.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }),
         price: parseFloat(point.priceUsd),
     }));
 
@@ -83,99 +136,154 @@ export default function CoinDetail({ coin, history, lastUpdated }: CoinDetailPro
                 description={`Detailed analysis and real-time price data for ${coin.name}.`}
             />
 
-            <main className="max-w-7xl mx-auto">
-                <Link href="/" className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-6">
+            <main className="max-w-7xl mx-auto py-8">
+                <Link href="/" className="inline-flex items-center text-sm text-gray-400 hover:text-white mb-6 transition-colors">
                     <ArrowLeft className="w-4 h-4 mr-1" /> Back to List
                 </Link>
 
-                <div className="bg-white dark:bg-zinc-800 shadow rounded-lg overflow-hidden">
+                <div className="glass-card overflow-hidden">
                     <div className="p-6 sm:p-8">
-                        <div className="flex items-center justify-between">
+                        {/* Header Section */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                             <div className="flex items-center gap-4">
                                 <img
                                     src={`https://assets.coincap.io/assets/icons/${coin.symbol.toLowerCase()}@2x.png`}
                                     alt={coin.name}
-                                    className="w-16 h-16 rounded-full"
+                                    className="w-16 h-16 rounded-full ring-2 ring-white/10"
                                     onError={(e) => {
-                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2264%22 height=%2264%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%23E5E7EB%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-size=%2214%22 fill=%22%236B7280%22%3E%3F%3C/text%3E%3C/svg%3E';
+                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2264%22 height=%2264%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%23262626%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-size=%2214%22 fill=%22%23525252%22%3E%3F%3C/text%3E%3C/svg%3E';
                                     }}
                                 />
                                 <div>
-                                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{coin.name}</h1>
-                                    <span className="text-lg text-gray-500 dark:text-gray-400 font-medium">{coin.symbol}</span>
+                                    <h1 className="text-3xl font-bold text-white">{coin.name}</h1>
+                                    <span className="text-lg text-primary-500 font-medium">{coin.symbol}</span>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(coin.priceUsd)}</p>
-                                <p className={`text-lg font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                    {isPositive ? '+' : ''}{priceChange.toFixed(2)}% (24h)
+                            <div className="text-left sm:text-right">
+                                <p className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
+                                    {formatCurrency(coin.priceUsd)}
+                                </p>
+                                <p className={`text-lg font-medium inline-flex items-center gap-1 ${isPositive ? 'text-secondary-500' : 'text-accent-500'}`}>
+                                    {isPositive ? <ArrowUp className="w-5 h-5" /> : <ArrowDown className="w-5 h-5" />}
+                                    {priceChange.toFixed(2)}% (24h)
                                 </p>
                             </div>
                         </div>
 
-                        <div className="mt-8 h-96 w-full">
-                            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Price History (24h)</h2>
-                            <ResponsiveContainer width="100%" height="100%">
+                        {/* Chart Section */}
+                        <div className="mt-8 h-[500px] w-full bg-white/5 rounded-xl p-4 border border-white/5 relative">
+                            <div className="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+                                <h2 className="text-xl font-semibold text-gray-200 flex items-center gap-2">
+                                    Price History <span className="text-sm font-normal text-gray-500">({interval})</span>
+                                </h2>
+                                <div className="flex p-1 bg-black/20 rounded-lg backdrop-blur-sm">
+                                    {TIME_RANGES.map((range) => (
+                                        <button
+                                            key={range.value}
+                                            onClick={() => setInterval(range.value)}
+                                            className={clsx(
+                                                "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                                                interval === range.value
+                                                    ? "bg-white/10 text-white shadow-sm"
+                                                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            )}
+                                        >
+                                            {range.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {isLoading && (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 backdrop-blur-sm rounded-xl">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+                                </div>
+                            )}
+
+                            <ResponsiveContainer width="100%" height="85%">
                                 <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                    <defs>
+                                        <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={isPositive ? '#8b5cf6' : '#f43f5e'} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={isPositive ? '#8b5cf6' : '#f43f5e'} stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                                     <XAxis
                                         dataKey="date"
-                                        minTickGap={30}
-                                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                                        minTickGap={40}
+                                        tick={{ fontSize: 11, fill: '#6B7280' }}
                                         axisLine={false}
                                         tickLine={false}
                                     />
                                     <YAxis
                                         domain={['auto', 'auto']}
                                         tickFormatter={(val) => `$${val.toLocaleString()}`}
-                                        tick={{ fontSize: 12, fill: '#6B7280' }}
+                                        tick={{ fontSize: 11, fill: '#6B7280' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        width={80}
+                                        width={60}
                                     />
                                     <Tooltip
                                         formatter={(value: any) => [`${formatCurrency(value)}`, 'Price']}
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                        contentStyle={{
+                                            backgroundColor: 'rgba(10, 10, 10, 0.8)',
+                                            backdropFilter: 'blur(12px)',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            color: '#fff',
+                                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                                        }}
+                                        itemStyle={{ color: '#fff' }}
+                                        labelStyle={{ color: '#9ca3af', marginBottom: '0.5rem' }}
+                                        cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1, strokeDasharray: '4 4' }}
                                     />
                                     <Line
                                         type="monotone"
                                         dataKey="price"
-                                        stroke={isPositive ? '#16A34A' : '#DC2626'}
-                                        strokeWidth={2}
+                                        stroke={isPositive ? '#8b5cf6' : '#f43f5e'}
+                                        strokeWidth={3}
                                         dot={false}
-                                        activeDot={{ r: 4 }}
+                                        activeDot={{ r: 6, fill: '#fff', strokeWidth: 0 }}
+                                        fill="url(#colorPrice)"
+                                        filter="drop-shadow(0 0 8px rgba(139, 92, 246, 0.3))"
+                                        animationDuration={1500}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
 
-                        <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                            <div className="bg-gray-50 dark:bg-zinc-700/50 overflow-hidden rounded-lg p-4">
-                                <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">Market Cap</dt>
-                                <dd className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{formatCurrency(coin.marketCapUsd)}</dd>
-                            </div>
-                            <div className="bg-gray-50 dark:bg-zinc-700/50 overflow-hidden rounded-lg p-4">
-                                <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">Volume (24h)</dt>
-                                <dd className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{formatCurrency(coin.volumeUsd24Hr)}</dd>
-                            </div>
-                            <div className="bg-gray-50 dark:bg-zinc-700/50 overflow-hidden rounded-lg p-4">
-                                <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">Supply</dt>
-                                <dd className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                                    {parseFloat(coin.supply).toLocaleString()} {coin.symbol}
-                                </dd>
-                            </div>
-                            <div className="bg-gray-50 dark:bg-zinc-700/50 overflow-hidden rounded-lg p-4">
-                                <dt className="truncate text-sm font-medium text-gray-500 dark:text-gray-400">Details</dt>
-                                <dd className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                                    {coin.explorer && (
-                                        <a href={coin.explorer} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center">
-                                            Explorer <ExternalLink className="w-4 h-4 ml-1" />
-                                        </a>
-                                    )}
-                                </dd>
-                            </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
+                            <motion.div
+                                className="p-5 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                                whileHover={{ y: -5 }}
+                            >
+                                <p className="text-sm text-gray-400 mb-2 flex items-center gap-2">
+                                    Market Cap
+                                </p>
+                                <p className="text-2xl font-bold text-white tracking-tight">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(parseFloat(coin.marketCapUsd))}
+                                </p>
+                            </motion.div>
+                            <motion.div
+                                className="p-5 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                                whileHover={{ y: -5 }}
+                            >
+                                <p className="text-sm text-gray-400 mb-2">Volume (24h)</p>
+                                <p className="text-2xl font-bold text-white tracking-tight">
+                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(parseFloat(coin.volumeUsd24Hr))}
+                                </p>
+                            </motion.div>
+                            <motion.div
+                                className="p-5 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors"
+                                whileHover={{ y: -5 }}
+                            >
+                                <p className="text-sm text-gray-400 mb-2">Circulating Supply</p>
+                                <p className="text-2xl font-bold text-white tracking-tight">
+                                    {new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(parseFloat(coin.supply))} {coin.symbol}
+                                </p>
+                            </motion.div>
                         </div>
-
                     </div>
                 </div>
             </main>

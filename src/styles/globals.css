@@ -1,5 +1,65 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: #0a0a0a;
+  --color-foreground: #ededed;
+
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+
+  --color-secondary-500: #10b981;
+  --color-secondary-600: #059669;
+
+  --color-accent-500: #f43f5e;
+
+  --color-glass-100: rgba(255, 255, 255, 0.05);
+  --color-glass-200: rgba(255, 255, 255, 0.1);
+  --color-glass-300: rgba(255, 255, 255, 0.2);
+
+  --animate-fade-in: fadeIn 0.5s ease-out;
+  --animate-slide-up: slideUp 0.5s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* Base Styles */
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  background: linear-gradient(to bottom, #0a0a0a, #000000);
+  color: var(--color-foreground);
+  min-height: 100vh;
+}
+
+/* Utilities */
+@utility glass-card {
+  @apply bg-glass-100 backdrop-blur-md border border-white/10 rounded-xl shadow-xl;
+}
+
+@utility glass-button {
+  @apply bg-primary-600 hover:bg-primary-500 text-white font-medium py-2 px-4 rounded-lg transition-all active:scale-95;
+}
+
+@utility text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-secondary-500;
 }
