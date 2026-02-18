@@ -3,11 +3,12 @@ import { NextSeo } from 'next-seo';
 import Link from 'next/link';
 import { getCoins } from '@/lib/coincap';
 import { Coin } from '@/types/coin';
-import { ArrowUp, ArrowDown, Search } from 'lucide-react';
+import { ArrowUp, ArrowDown, Search, Star } from 'lucide-react';
 import clsx from 'clsx';
 import { useState } from 'react';
 import Hero from '@/components/home/Hero';
 import { motion } from 'framer-motion';
+import { useWatchlist } from '@/hooks/useWatchlist';
 
 interface HomeProps {
   coins: Coin[];
@@ -24,11 +25,15 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
 
 export default function Home({ coins }: HomeProps) {
   const [search, setSearch] = useState('');
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const { watchlist, toggleWatchlist, isInWatchlist, isLoaded } = useWatchlist();
 
-  const filteredCoins = coins.filter(coin =>
-    coin.name.toLowerCase().includes(search.toLowerCase()) ||
-    coin.symbol.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredCoins = coins.filter(coin => {
+    const matchesSearch = coin.name.toLowerCase().includes(search.toLowerCase()) ||
+      coin.symbol.toLowerCase().includes(search.toLowerCase());
+    const matchesFavorites = showFavoritesOnly ? isInWatchlist(coin.id) : true;
+    return matchesSearch && matchesFavorites;
+  });
 
   const formatCurrency = (value: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -63,7 +68,26 @@ export default function Home({ coins }: HomeProps) {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="market-table">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h2 className="text-2xl font-bold">Market Trends</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold">Market Trends</h2>
+            <button
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className={clsx(
+                "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border",
+                showFavoritesOnly
+                  ? "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                  : "bg-white/5 text-gray-400 border-white/5 hover:bg-white/10 hover:text-gray-200"
+              )}
+            >
+              <Star className={clsx("w-4 h-4", showFavoritesOnly && "fill-current")} />
+              <span>Watchlist</span>
+              {watchlist.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/10 text-xs">
+                  {watchlist.length}
+                </span>
+              )}
+            </button>
+          </div>
 
           <div className="relative w-full md:w-96">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -90,7 +114,10 @@ export default function Home({ coins }: HomeProps) {
             <table className="min-w-full divide-y divide-white/5">
               <thead className="bg-white/5">
                 <tr>
-                  <th scope="col" className="py-4 pl-6 pr-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  <th scope="col" className="w-12 py-4 pl-6 pr-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    {/* Star column */}
+                  </th>
+                  <th scope="col" className="py-4 pl-3 pr-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                     Rank
                   </th>
                   <th scope="col" className="px-3 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -112,6 +139,22 @@ export default function Home({ coins }: HomeProps) {
                   filteredCoins.map((coin) => (
                     <tr key={coin.id} className="hover:bg-white/5 transition-colors group">
                       <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-500 font-mono">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleWatchlist(coin.id);
+                          }}
+                          className="text-gray-600 hover:text-yellow-500 transition-colors focus:outline-none"
+                        >
+                          <Star
+                            className={clsx(
+                              "w-4 h-4",
+                              isInWatchlist(coin.id) ? "fill-yellow-500 text-yellow-500" : "text-gray-600 dark:text-gray-600"
+                            )}
+                          />
+                        </button>
+                      </td>
+                      <td className="whitespace-nowrap py-4 pl-3 pr-3 text-sm text-gray-500 font-mono">
                         {coin.rank}
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-white">
@@ -149,8 +192,11 @@ export default function Home({ coins }: HomeProps) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-10 text-center text-sm text-gray-500">
-                      No coins found matching "{search}"
+                    <td colSpan={6} className="py-10 text-center text-sm text-gray-500">
+                      {showFavoritesOnly
+                        ? (watchlist.length === 0 ? "Your watchlist is empty." : "No saved coins match your search.")
+                        : `No coins found matching "${search}"`
+                      }
                     </td>
                   </tr>
                 )}

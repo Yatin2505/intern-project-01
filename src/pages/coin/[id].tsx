@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { getCoinDetails, getCoinHistory } from '@/lib/coincap';
 import { Coin, CoinHistory } from '@/types/coin';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { ArrowLeft, ArrowUp, ArrowDown, ExternalLink, Clock } from 'lucide-react';
+import { ArrowLeft, ArrowUp, ArrowDown, ExternalLink, Clock, Star } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+import { useWatchlist } from '@/hooks/useWatchlist';
 
 interface CoinDetailProps {
     coin: Coin | null;
@@ -49,6 +50,7 @@ export default function CoinDetail({ coin, history: initialHistory, lastUpdated 
     const [history, setHistory] = useState<CoinHistory[]>(initialHistory);
     const [interval, setInterval] = useState('1D');
     const [isLoading, setIsLoading] = useState(false);
+    const { toggleWatchlist, isInWatchlist } = useWatchlist();
 
     // Effect to fetch history when interval changes (client-side)
     useEffect(() => {
@@ -155,7 +157,20 @@ export default function CoinDetail({ coin, history: initialHistory, lastUpdated 
                                     }}
                                 />
                                 <div>
-                                    <h1 className="text-3xl font-bold text-white">{coin.name}</h1>
+                                    <div className="flex items-center gap-3">
+                                        <h1 className="text-3xl font-bold text-white">{coin.name}</h1>
+                                        <button
+                                            onClick={() => toggleWatchlist(coin.id)}
+                                            className="focus:outline-none transition-transform active:scale-95"
+                                        >
+                                            <Star
+                                                className={clsx(
+                                                    "w-6 h-6",
+                                                    isInWatchlist(coin.id) ? "fill-yellow-500 text-yellow-500" : "text-gray-400 hover:text-yellow-500"
+                                                )}
+                                            />
+                                        </button>
+                                    </div>
                                     <span className="text-lg text-primary-500 font-medium">{coin.symbol}</span>
                                 </div>
                             </div>
