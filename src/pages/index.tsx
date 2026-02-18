@@ -117,7 +117,7 @@ export default function Home({ coins }: HomeProps) {
                           alt={coin.name}
                           className="w-6 h-6 rounded-full"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24?text=?';
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 width=%2224%22 height=%2224%22%3E%3Ccircle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%23E5E7EB%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-size=%2214%22 fill=%22%236B7280%22%3E%3F%3C/text%3E%3C/svg%3E';
                           }}
                         />
                         <span className="font-bold">{coin.name}</span>
