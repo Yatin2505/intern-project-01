@@ -6,6 +6,12 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
+    const [isConnected, setIsConnected] = React.useState(false);
+
+    const handleConnect = () => {
+        setIsConnected(!isConnected);
+    };
+
     return (
         <div className="min-h-screen flex flex-col font-sans text-foreground bg-background selection:bg-primary-500/30">
             <header className="fixed top-0 w-full z-50 glass-card rounded-none border-x-0 border-t-0 border-b border-white/10 px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -24,8 +30,14 @@ export default function Layout({ children }: LayoutProps) {
                     <Link href="/watchlist" className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
                         Watchlist
                     </Link>
-                    <button className="glass-button text-sm py-1.5 px-4">
-                        Connect
+                    <button
+                        onClick={handleConnect}
+                        className={`text-sm py-1.5 px-4 rounded-lg transition-all ${isConnected
+                                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/50'
+                                : 'glass-button'
+                            }`}
+                    >
+                        {isConnected ? 'Connected: 0x...1234' : 'Connect Wallet'}
                     </button>
                 </nav>
             </header>

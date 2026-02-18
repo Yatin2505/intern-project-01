@@ -213,3 +213,49 @@ export const getCoinHistory = async (id: string, interval = '1D'): Promise<CoinH
         return history;
     }
 };
+
+export const getCoinsByIds = async (ids: string[]): Promise<Coin[]> => {
+    if (ids.length === 0) return [];
+
+    try {
+        // CoinLore doesn't have a clean "batch by id" endpoint that accepts slugs (nameid).
+        // It has `?id=90,80` but that uses internal numeric ID.
+        // We have slugs (bitcoin, ethereum).
+        // Best approach for client-side watchlist of mixed popularity:
+        // 1. Fetch top 100 (covers most).
+        // 2. If any missing, fetch details individually (parallel).
+
+        const response = await axios.get<{ data: CoinLoreTicker[] }>(`${COINLORE_API_URL}/tickers/`, {
+            params: { start: 0, limit: 100 },
+            timeout: 5000
+        });
+
+        const top100 = response.data.data.map(mapCoinLoreToCoin);
+        const top100Map = new Map(top100.map(c => [c.id, c]));
+
+        const results: Coin[] = [];
+        const missingIds: string[] = [];
+
+        for (const id of ids) {
+            if (top100Map.has(id)) {
+                results.push(top100Map.get(id)!);
+            } else {
+                missingIds.push(id);
+            }
+        }
+
+        if (missingIds.length > 0) {
+            // Fetch missing individually
+            const missingPromises = missingIds.map(id => getCoinDetails(id));
+            const missingCoins = await Promise.all(missingPromises);
+            missingCoins.forEach(coin => {
+                if (coin) results.push(coin);
+            });
+        }
+
+        return results;
+    } catch (error) {
+        console.warn('Error fetching coins by IDs:', error);
+        return [];
+    }
+};
