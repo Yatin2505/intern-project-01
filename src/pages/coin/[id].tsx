@@ -9,6 +9,7 @@ import { ArrowLeft, ExternalLink } from 'lucide-react';
 interface CoinDetailProps {
     coin: Coin | null;
     history: CoinHistory[];
+    lastUpdated: string;
 }
 
 export const getServerSideProps: GetServerSideProps<CoinDetailProps> = async (context) => {
@@ -28,11 +29,12 @@ export const getServerSideProps: GetServerSideProps<CoinDetailProps> = async (co
         props: {
             coin,
             history,
+            lastUpdated: new Date().toISOString(),
         },
     };
 };
 
-export default function CoinDetail({ coin, history }: CoinDetailProps) {
+export default function CoinDetail({ coin, history, lastUpdated }: CoinDetailProps) {
     if (!coin) return null;
 
     const chartData = history.map(point => ({
@@ -40,13 +42,14 @@ export default function CoinDetail({ coin, history }: CoinDetailProps) {
         price: parseFloat(point.priceUsd),
     }));
 
-    const formatCurrency = (value: string) => {
+    const formatCurrency = (value: string | number) => {
+        const num = typeof value === 'string' ? parseFloat(value) : value;
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
             minimumFractionDigits: 2,
             maximumFractionDigits: 6,
-        }).format(parseFloat(value));
+        }).format(num);
     };
 
     const priceChange = parseFloat(coin.changePercent24Hr);
@@ -74,7 +77,7 @@ export default function CoinDetail({ coin, history }: CoinDetailProps) {
                 url={`https://crypto-seo-ssr.vercel.app/coin/${coin.id}`}
                 title={`${coin.name} Price Analysis`}
                 images={[`https://assets.coincap.io/assets/icons/${coin.symbol.toLowerCase()}@2x.png`]}
-                datePublished={new Date().toISOString()}
+                datePublished={lastUpdated}
                 authorName={['Crypto SEO SSR']}
                 publisherName="Crypto SEO SSR"
                 description={`Detailed analysis and real-time price data for ${coin.name}.`}
